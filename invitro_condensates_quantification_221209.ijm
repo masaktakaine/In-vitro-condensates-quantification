@@ -32,7 +32,19 @@ globalmedians = newArray;
 globalmodes = newArray;
 globalsds = newArray;
 thresholds = newArray;
-particlenums = newArray;
+particle_nums = newArray;
+
+mean_areas = newArray();
+//sd_areas = newArray();
+mean_meanints = newArray();
+//sd_meanints = newArray();
+mean_intdens = newArray();
+//sd_intdens = newArray();
+sum_intdens = newArray();
+mean_roundness = newArray();
+mean_AR = newArray();
+mean_circ = newArray();
+mean_solidity = newArray();
 
 dirD = dirD1 +"/"+ edate1 + "_output";
 File.makeDirectory(dirD);
@@ -57,7 +69,7 @@ for (i = 0; i < imagefilelist.length; i++) {
 	else if ((endsWith(currFile, ".tif"))||(endsWith(currFile, ".tiff"))) {// process if files ending with .tif or .tiff (hyperstack files)
 			open(currFile); 
 		}
-
+run("Clear Results");						// Reset Results window
 print("\\Clear"); 
 title = getTitle();
 // Remove the extension from the filename
@@ -102,26 +114,53 @@ resetThreshold();
 
 // Detection of condensates
 run("Set Measurements...", "area mean min centroid shape integrated redirect=None decimal=3"); 
+//run("Analyze Particles...", "size=0.04-1 circularity=0.1-1.00 show=Masks exclude clear add");
 run("Analyze Particles...", "size=0.04-500 circularity=0.1-1.00 show=Masks exclude clear add");
 //run("Analyze Particles...", "size=0.02-100 circularity=0.3-1.00 show=Outlines exclude clear add"); // outline
-particlenums[i] = nResults;
+particle_nums[i] = nResults;
 
 if (nResults !=0) {  // if particles were detected
+run("Clear Results");
 selectImage(GRID);; // Superimpose ROIs on the original fluorescence image
 roiManager("Show None");
 roiManager("Show All");
-run("Clear Results");
 roiManager("Measure");
-
-for(k=0; k<nResults; k++) {   // Activate and analyse a ROI one by one
+//wait(100);
+for(k=0; k<nResults; k++) {
  setResult("date",k,edate);
  setResult("file",k,title_s);
  setResult("gMean",k, globalmean);
  setResult("gMedian",k,globalmedian);
  setResult("gMode",k,globalmode);
  setResult("gSD",k,globalsd);
- setResult("threshold",k,threshold);				
+ setResult("threshold",k,threshold);		
 }
+// Because Table.getColumn() does not work in batch-mode ("hide"),
+//the specified column in the Results table is obtained as an array by iterating getResult().
+colArea = newArray();
+colMean = newArray();
+colIntDen = newArray();
+colRound = newArray();
+colAR = newArray();
+colCirc = newArray();
+colSolid = newArray();
+for (p=0; p<nResults; p++){ 
+	colArea[p] =getResult("Area", p);
+	colMean[p] =getResult("Mean",p);
+	colIntDen[p] = getResult("IntDen",p);
+	colRound[p] = getResult("Round",p);
+	colAR[p] = getResult("AR",p);
+	colCirc[p] = getResult("Circ.",p);
+	colSolid[p] = getResult("Solidity",p);
+}
+Array.getStatistics(colArea, min1, max1, mean1, stdDev1);
+// Return min, max, mean and stdDev of the Area column to min1, max1, mean1 and stdDev1, respectively
+Array.getStatistics(colMean, min2, max2, mean2, stdDev2);
+Array.getStatistics(colIntDen, min3, max3, mean3, stdDev3);
+Array.getStatistics(colRound, min4, max4, mean4, stdDev4);
+Array.getStatistics(colAR, min5, max5, mean5, stdDev5);
+Array.getStatistics(colCirc, min6, max6, mean6, stdDev6);
+Array.getStatistics(colSolid, min7, max7, mean7, stdDev7);
 saveAs("Results", dirCSV + title_s + ".csv");
 } else{ // if no particels were detected
 	run("Clear Results");
@@ -147,6 +186,7 @@ saveAs("Results", dirCSV + title_s + ".csv");
  saveAs("Results", dirCSV + title_s + ".csv");
  wait(100);
 }
+
 selectWindow("Mask of Temp");
 roiManager("Show None");
 roiManager("Show All"); 	// Show all ROIs to save the ROIs as overlays
@@ -169,16 +209,47 @@ globalmedians[i] = globalmedian;
 globalmodes[i] = globalmode;	
 globalsds[i] = globalsd;	
 thresholds[i] = threshold;
-//particlenums[i] = nResults;
+
+if (particle_nums[i] !=0) {
+mean_areas[i] = mean1;
+mean_meanints[i] = mean2;
+mean_intdens[i] = mean3;
+sum_intdens[i] = particle_nums[i]*mean_intdens[i];
+mean_roundness[i] = mean4;
+mean_AR[i] = mean5;
+mean_circ[i] = mean6;
+mean_solidity[i] = mean7;
+} else{
+	mean_areas[i] = NaN;
+	mean_meanints[i] = NaN;
+	mean_intdens[i] = NaN;
+	sum_intdens[i] = NaN;
+	mean_roundness[i] = NaN;
+	mean_AR[i] = NaN;
+	mean_circ[i] = NaN;
+mean_solidity[i] = NaN;
 }
-Array.show("global_prams(row numbers)", date, file_name, raw_globalmeans, raw_globalmedians, raw_globalmodes, raw_globalsds,globalmeans, globalmedians, globalmodes, globalsds, thresholds,particlenums); //配列を独立したwindowに表示する、タイトルが(row numbers)で終わると最初の列が1から始まる行のインデックスになる												
+//particle_nums[i] = nResults;
+}
+// Show global parameters of the image in a new table.	
+Array.show("global_prams(row numbers)", date, file_name, raw_globalmeans, raw_globalmedians,
+raw_globalmodes, raw_globalsds,globalmeans, globalmedians, globalmodes,
+globalsds, thresholds,particle_nums);
+//run("Summarize");									
     selectWindow("global_prams");
-    saveAs("Results", dirD +"/"+ edate1 + "_global_prams.csv"); 
- 
+    saveAs("Results", dirD +"/"+ edate1 + "_global_prams.csv");
+    run("Close");
+    
+// Show statistics of the particles in a new table.	
+Array.show("particle_stat(row numbers)", date, file_name,particle_nums, mean_areas,
+mean_meanints, mean_intdens, sum_intdens, mean_roundness, mean_AR, mean_circ, mean_solidity);
+	selectWindow("particle_stat");
+    saveAs("Results", dirD +"/"+ edate1 + "_particle_stat.csv");
 	run("Close");	
     run("Clear Results");						// Reset Results window
 	print("\\Clear"); 							// Reset Log window
 	roiManager("reset");						// Reset ROI manager
-	
+	run("Close All");
+	run("Close All");
 	showMessage(" ", "<html>"+"<font size=+2>Process completed<br>");
 }
