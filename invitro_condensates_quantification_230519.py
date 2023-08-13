@@ -70,7 +70,7 @@ def analyse_vitro_image(current_file_path):
 	rm = RoiManager.getRoiManager()
 	if curr_pnums != 0: # if particles were detected
 		rt.reset()
-		rm.runCommand(imp,"Show None")
+		rm.runCommand(imp,"Show None") # Superimpose ROIs on the original fluorescence image
 		rm.runCommand(imp,"Show All")
 		rm.runCommand(imp,"Measure")
 		for j in range(0, rt.size()):
